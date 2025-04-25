@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>PDF 分割ツール</title>
+    <style>
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f9;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+        .container {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            width: 90%;
+            max-width: 400px;
+            text-align: center;
+        }
+        h1 {
+            margin-bottom: 20px;
+            color: #333;
+        }
+        form {
+            display: flex;
+            flex-direction: column;
+        }
+        input[type="file"],
+        input[type="number"],
+        input[type="submit"],
+        select {
+            margin-bottom: 15px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        input[type="submit"] {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        input[type="submit"]:hover {
+            background-color: #45a049;
+        }
+        #rangeInputs, #chunkSizeInput {
+            display: none;
+        }
+        .checkbox-group {
+            max-height: 300px;
+            overflow-y: auto;
+            text-align: left;
+            border: 1px solid #ccc;
+            padding: 10px;
+            border-radius: 6px;
+            margin-bottom: 15px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>PDF 分割ツール</h1>
+
+        {% if action == 'split_range' %}
+        <form action="/" method="post">
+            <input type="hidden" name="action" value="extract_selected">
+            <input type="hidden" name="file_data" value="{{ file_data }}">
+            <div class="checkbox-group">
+                {% for i in range(page_count) %}
+                    <label><input type="checkbox" name="selected_pages" value="{{ i }}"> ページ {{ i + 1 }}</label>
+                {% endfor %}
+            </div>
+            <input type="submit" value="PDFを分割">
+        </form>
+        {% else %}
+        <form action="/" method="post" enctype="multipart/form-data">
+            <label for="file">PDFファイルを選択:</label>
+            <input type="file" name="file" id="file" required>
+
+            <label for="action">アクションを選択:</label>
+            <select name="action" id="action" onchange="toggleRangeInput()">
+                <option value="split_range">ページ範囲で分割</option>
+                <option value="split_all">すべてのページを分割</option>
+            </select>
+
+            <div id="rangeInputs">
+                <label for="start_page">開始ページ:</label>
+                <input type="number" name="start_page" id="start_page" min="1">
+                <label for="end_page">終了ページ:</label>
+                <input type="number" name="end_page" id="end_page" min="1">
+            </div>
+
+            <div id="chunkSizeInput">
+                <label for="chunk_size">分割単位（ページ数）:</label>
+                <input type="number" name="chunk_size" id="chunk_size" min="1" value="1">
+            </div>
+
+            <input type="submit" value="PDFを分割">
+        </form>
+        {% endif %}
+    </div>
+
+    <script>
+        function toggleRangeInput() {
+            const action = document.getElementById('action').value;
+            const rangeInputs = document.getElementById('rangeInputs');
+            const chunkSizeInput = document.getElementById('chunkSizeInput');
+            const startPage = document.getElementById('start_page');
+            const endPage = document.getElementById('end_page');
+
+            if (action === 'split_all') {
+                rangeInputs.style.display = 'none';
+                chunkSizeInput.style.display = 'block';
+                startPage.removeAttribute('required');
+                endPage.removeAttribute('required');
+            } else {
+                rangeInputs.style.display = 'block';
+                chunkSizeInput.style.display = 'none';
+                startPage.setAttribute('required', 'required');
+                endPage.setAttribute('required', 'required');
+            }
+        }
+
+        window.addEventListener('DOMContentLoaded', toggleRangeInput);
+    </script>
+</body>
+</html>
