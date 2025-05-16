@@ -33,6 +33,7 @@
         }
         input[type="file"],
         input[type="number"],
+        input[type="text"],
         input[type="submit"],
         select {
             margin-bottom: 15px;
@@ -60,20 +61,24 @@
         <h1>PDF 分割ツール</h1>
 
         <form action="/" method="post" enctype="multipart/form-data">
-            <label for="file">PDFファイルを選択:</label>
-            <input type="file" name="file" id="file" required>
+            <label for="file">PDFファイルを選択してください:</label>
+            <input type="file" name="file" id="file" accept=".pdf" required>
 
-            <label for="action">アクションを選択:</label>
+            <label for="action">操作を選んでください:</label>
             <select name="action" id="action" onchange="toggleInputs()" required>
-                <option value="split_range">ページ範囲で抽出</option>
-                <option value="split_all">すべてのページを分割</option>
+                <option value="split_range">指定したページ範囲を抽出する</option>
+                <option value="split_all">すべてのページを指定単位で分割する</option>
             </select>
 
             <div id="rangeInputs">
-                <label for="start_page">開始ページ:</label>
-                <input type="number" name="start_page" id="start_page" min="1">
-                <label for="end_page">終了ページ:</label>
-                <input type="number" name="end_page" id="end_page" min="1">
+                <div>
+                    <label for="start_page">開始ページ番号:</label><br>
+                    <input type="number" name="start_page" id="start_page" min="1">
+                </div>
+                <div>
+                    <label for="end_page">終了ページ番号:</label><br>
+                    <input type="number" name="end_page" id="end_page" min="1">
+                </div>
             </div>
 
             <div id="chunkSizeInput">
@@ -81,7 +86,10 @@
                 <input type="number" name="chunk_size" id="chunk_size" min="1" value="1">
             </div>
 
-            <input type="submit" value="PDFを処理">
+            <label for="output_name">出力ファイル名（任意）:</label>
+            <input type="text" name="output_name" id="output_name" placeholder="例：分割結果">
+
+            <input type="submit" value="PDFを処理する">
         </form>
     </div>
 
@@ -91,13 +99,8 @@
             const rangeInputs = document.getElementById('rangeInputs');
             const chunkSizeInput = document.getElementById('chunkSizeInput');
 
-            if (action === 'split_all') {
-                rangeInputs.style.display = 'none';
-                chunkSizeInput.style.display = 'block';
-            } else {
-                rangeInputs.style.display = 'block';
-                chunkSizeInput.style.display = 'none';
-            }
+            rangeInputs.style.display = action === 'split_range' ? 'block' : 'none';
+            chunkSizeInput.style.display = action === 'split_all' ? 'block' : 'none';
         }
         window.addEventListener('DOMContentLoaded', toggleInputs);
     </script>
