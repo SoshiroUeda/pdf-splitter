@@ -1,116 +1,138 @@
-from flask import Flask, request, render_template, send_file
+from flask import Flask, render_template, request, redirect, url_for, send_file, session, render_template_string
+from werkzeug.utils import secure_filename  # ※未使用でも一応残しておく
 from PyPDF2 import PdfReader, PdfWriter
-from werkzeug.utils import secure_filename
+from pdf2image import convert_from_bytes
 from io import BytesIO
-import logging
-import base64
-import zipfile
 import os
+import zipfile
+import tempfile
+import uuid
+import base64
+import re  # ← 追加
 
 app = Flask(__name__)
-app.config['MAX_CONTENT_LENGTH'] = 20 * 1024 * 1024  # 最大20MB
+app.secret_key = 'your_secret_key_here'
+app.config['UPLOAD_FOLDER'] = tempfile.gettempdir()
+app.config['MAX_CONTENT_LENGTH'] = 20 * 1024 * 1024
 
-# ログ設定（本番ではINFOに）
-if os.getenv('FLASK_ENV') == 'production':
-    logging.basicConfig(level=logging.INFO)
-else:
-    logging.basicConfig(level=logging.DEBUG)
+def split_pdf_by_points(reader, split_points, base_name):
+    split_files = []
+    start = 0
+    for i, end in enumerate(split_points):
+        if end <= start:
+            continue  # 不正な範囲をスキップ
+        writer = PdfWriter()
+        for j in range(start, end):
+            writer.add_page(reader.pages[j])
+        output = BytesIO()
+        writer.write(output)
+        output.seek(0)
+        filename = f"{base_name}-part-{i+1}.pdf"
+        split_files.append((filename, output))
+        start = end
+    return split_files
 
-def split_all_pages(reader, chunk_size, base_name):
-    output_zip = BytesIO()
-    with zipfile.ZipFile(output_zip, 'w') as zipf:
-        for i in range(0, len(reader.pages), chunk_size):
-            writer = PdfWriter()
-            for j in range(i, min(i + chunk_size, len(reader.pages))):
-                writer.add_page(reader.pages[j])
-            pdf_bytes = BytesIO()
-            writer.write(pdf_bytes)
-            zipf.writestr(f'{base_name}_part_{i // chunk_size + 1}.pdf', pdf_bytes.getvalue())
-    output_zip.seek(0)
-    return output_zip
 
-def extract_selected_pages(reader, selected_pages):
-    writer = PdfWriter()
-    for i in selected_pages:
-        if 0 <= i < len(reader.pages):
-            writer.add_page(reader.pages[i])
-    output = BytesIO()
-    writer.write(output)
-    output.seek(0)
-    return output
-
-def extract_page_range(reader, start, end):
-    if start > end or start < 0 or end >= len(reader.pages):
-        raise ValueError("ページ範囲が不正です。")
-    writer = PdfWriter()
-    for i in range(start, end + 1):
-        writer.add_page(reader.pages[i])
-    output = BytesIO()
-    writer.write(output)
-    output.seek(0)
-    return output
-
-@app.route('/', methods=['GET', 'POST'])
+@app.route('/')
 def index():
-    if request.method == 'POST':
-        action = request.form.get('action')
-        output_name = request.form.get('output_name', '').strip() or 'output'
-
-        # 選択ページ抽出モード
-        if action == 'extract_selected':
-            try:
-                selected_pages = [int(i) for i in request.form.getlist('selected_pages')]
-                encoded_data = request.form.get('file_data')
-                file_bytes = base64.b64decode(encoded_data)
-                reader = PdfReader(BytesIO(file_bytes))
-                output = extract_selected_pages(reader, selected_pages)
-                return send_file(output, as_attachment=True,
-                                 download_name=f'{output_name}.pdf',
-                                 mimetype='application/pdf')
-            except Exception as e:
-                logging.warning(f"ユーザーエラー extract_selected: {e}")
-                return f"エラー：{e}", 400
-
-        # 通常のアップロード処理
-        file = request.files.get('file')
-        if not file or file.filename == '':
-            return "エラー：PDFファイルをアップロードしてください。", 400
-
-        if not file.filename.lower().endswith('.pdf'):
-            return "エラー：PDFファイルのみ対応しています。", 400
-
-        if file.mimetype != 'application/pdf':
-            return "エラー：MIMEタイプがPDFではありません。", 400
-
-        try:
-            file_bytes = file.read()
-            try:
-                reader = PdfReader(BytesIO(file_bytes))
-            except Exception as e:
-                return f"エラー：PDFファイルの読み込みに失敗しました。({e})", 400
-
-            base_name = secure_filename(os.path.splitext(file.filename)[0])
-
-            if action == 'split_all':
-                chunk_size = max(1, int(request.form.get('chunk_size', '1')))
-                output_zip = split_all_pages(reader, chunk_size, base_name)
-                return send_file(output_zip, as_attachment=True,
-                                 download_name='split_pages.zip',
-                                 mimetype='application/zip')
-
-            elif action == 'split_range':
-                start = int(request.form.get('start_page')) - 1
-                end = int(request.form.get('end_page')) - 1
-                output = extract_page_range(reader, start, end)
-                return send_file(output, as_attachment=True,
-                                 download_name=f'{output_name}.pdf',
-                                 mimetype='application/pdf')
-
-            else:
-                return "エラー：不正な操作が選択されました。", 400
-
-        except Exception as e:
-            logging.error(f"処理中のエラー: {e}")
-            return f"エラー：{e}", 500
-
     return render_template('index.html')
+
+@app.route('/preview', methods=['POST'])
+def preview():
+    file = request.files.get('file')
+    if not file or file.filename == '':
+        return "PDFファイルを選択してください", 400
+
+    # 日本語ファイル名を安全に扱うため、危険文字だけ除去
+    original_name = file.filename
+    name_without_ext, ext = os.path.splitext(original_name)
+    safe_name = re.sub(r'[\/\\\0\r\n]', '', name_without_ext)
+    filename = f"{safe_name}{ext}"
+
+    unique_id = str(uuid.uuid4())
+    temp_pdf_path = os.path.join(app.config['UPLOAD_FOLDER'], f"{unique_id}_{filename}")
+    file.save(temp_pdf_path)
+
+    session['temp_pdf_path'] = temp_pdf_path
+    session['filename'] = filename
+    session['pdf_id'] = unique_id
+
+    with open(temp_pdf_path, 'rb') as f:
+        images = convert_from_bytes(f.read())
+
+    encoded_images = []
+    for i, img in enumerate(images):
+        buf = BytesIO()
+        img.save(buf, format='PNG')
+        encoded = base64.b64encode(buf.getvalue()).decode('utf-8')
+        encoded_images.append({'index': i, 'data': encoded})
+
+    return render_template('preview.html', images=encoded_images, total=len(encoded_images))
+
+@app.route('/confirm', methods=['POST'])
+def confirm():
+    split_points = request.form.get('split_points', '')
+    split_points = [int(i) for i in split_points.split(',') if i.isdigit()]
+    split_points = sorted(set(split_points))
+    session['split_points'] = split_points
+
+    temp_pdf_path = session.get('temp_pdf_path')
+    if not temp_pdf_path or not os.path.exists(temp_pdf_path):
+        return "PDFファイルが見つかりません。", 400
+
+    with open(temp_pdf_path, 'rb') as f:
+        reader = PdfReader(BytesIO(f.read()))
+        total_pages = len(reader.pages)
+
+    ranges = []
+    prev = 0
+    split_points.append(total_pages)
+    for i, point in enumerate(split_points):
+        ranges.append((i + 1, prev + 1, point))
+        prev = point
+
+    filename = os.path.splitext(session.get('filename', 'output'))[0]
+
+    html = render_template_string('''
+    <div class="popup-content" style="background: #fff; padding: 24px; border-radius: 12px; text-align: left; box-shadow: 0 0 20px rgba(0,0,0,0.2); max-width: 500px;">
+      <h2 style="margin-bottom: 16px; color: #333;">分割ファイルを保存する</h2>
+      <p style="margin-bottom: 16px;">元のファイルを分割し、以下の名前で保存します：</p>
+      <ul style="list-style: none; padding: 0; margin-bottom: 24px;">
+        {% for i, start, end in ranges %}
+          <li style="margin-bottom: 8px;">📄 <strong>{{ filename }}-part-{{ i }}.pdf</strong>（{{ start }} ～ {{ end }} ページ）</li>
+        {% endfor %}
+      </ul>
+      <form action="{{ url_for('download') }}" method="post" style="display:inline;">
+        <button type="submit" style="padding: 10px 20px; font-size: 16px; background-color: #0078D4; color: #fff; border: none; border-radius: 6px; cursor: pointer;">保存</button>
+      </form>
+      <button onclick="document.getElementById('popupOverlay').style.display='none';" style="margin-left: 12px; padding: 10px 20px; font-size: 16px; background-color: #ccc; border: none; border-radius: 6px; cursor: pointer;">キャンセル</button>
+    </div>
+    ''', ranges=ranges, filename=filename)
+
+    return html
+
+@app.route('/download', methods=['POST'])
+def download():
+    split_points = session.get('split_points', [])
+    temp_pdf_path = session.get('temp_pdf_path')
+    if not temp_pdf_path or not os.path.exists(temp_pdf_path):
+        return "PDFファイルが見つかりません。", 400
+
+    with open(temp_pdf_path, 'rb') as f:
+        file_data = f.read()
+    reader = PdfReader(BytesIO(file_data))
+
+    base_name = os.path.splitext(session.get('filename', 'output'))[0]
+    split_files = split_pdf_by_points(reader, split_points, base_name)
+
+    zip_stream = BytesIO()
+    with zipfile.ZipFile(zip_stream, 'w') as zipf:
+        for name, file_stream in split_files:
+            zipf.writestr(name, file_stream.read())
+    zip_stream.seek(0)
+
+    zip_filename = f"{base_name}-split.zip"
+    return send_file(zip_stream, as_attachment=True, download_name=zip_filename, mimetype='application/zip')
+
+if __name__ == '__main__':
+    app.run(debug=True, host='0.0.0.0', port=5000)

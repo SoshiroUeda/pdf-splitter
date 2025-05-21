@@ -2,107 +2,55 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>PDF 分割ツール</title>
+    <title>PDF 分割ツール - アップロード</title>
     <style>
         body {
             font-family: 'Helvetica Neue', Arial, sans-serif;
-            margin: 0;
-            padding: 0;
             background-color: #f4f4f9;
             display: flex;
             justify-content: center;
             align-items: center;
             height: 100vh;
+            margin: 0;
         }
         .container {
             background-color: #fff;
-            padding: 20px;
+            padding: 30px;
             border-radius: 8px;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
+            text-align: center;
             width: 90%;
             max-width: 400px;
-            text-align: center;
         }
         h1 {
-            margin-bottom: 20px;
             color: #333;
+            margin-bottom: 20px;
         }
-        form {
-            display: flex;
-            flex-direction: column;
-        }
-        input[type="file"],
-        input[type="number"],
-        input[type="text"],
-        input[type="submit"],
-        select {
-            margin-bottom: 15px;
-            padding: 10px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            font-size: 16px;
+        input[type="file"] {
+            margin-bottom: 20px;
         }
         input[type="submit"] {
+            padding: 10px 20px;
             background-color: #4CAF50;
             color: white;
             border: none;
+            border-radius: 4px;
+            font-size: 16px;
             cursor: pointer;
         }
         input[type="submit"]:hover {
             background-color: #45a049;
         }
-        #rangeInputs, #chunkSizeInput {
-            display: none;
-        }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>PDF 分割ツール</h1>
-
-        <form action="/" method="post" enctype="multipart/form-data">
-            <label for="file">PDFファイルを選択してください:</label>
-            <input type="file" name="file" id="file" accept=".pdf" required>
-
-            <label for="action">操作を選んでください:</label>
-            <select name="action" id="action" onchange="toggleInputs()" required>
-                <option value="split_range">指定したページ範囲を抽出する</option>
-                <option value="split_all">すべてのページを指定単位で分割する</option>
-            </select>
-
-            <div id="rangeInputs">
-                <div>
-                    <label for="start_page">開始ページ番号:</label><br>
-                    <input type="number" name="start_page" id="start_page" min="1">
-                </div>
-                <div>
-                    <label for="end_page">終了ページ番号:</label><br>
-                    <input type="number" name="end_page" id="end_page" min="1">
-                </div>
-            </div>
-
-            <div id="chunkSizeInput">
-                <label for="chunk_size">分割単位（ページ数）:</label>
-                <input type="number" name="chunk_size" id="chunk_size" min="1" value="1">
-            </div>
-
-            <label for="output_name">出力ファイル名（任意）:</label>
-            <input type="text" name="output_name" id="output_name" placeholder="例：分割結果">
-
-            <input type="submit" value="PDFを処理する">
+        <h1>PDFファイルをアップロード</h1>
+        <form action="{{ url_for('preview') }}" method="post" enctype="multipart/form-data">
+            <input type="file" name="file" accept=".pdf" required>
+            <br>
+            <input type="submit" value="アップロード">
         </form>
     </div>
-
-    <script>
-        function toggleInputs() {
-            const action = document.getElementById('action').value;
-            const rangeInputs = document.getElementById('rangeInputs');
-            const chunkSizeInput = document.getElementById('chunkSizeInput');
-
-            rangeInputs.style.display = action === 'split_range' ? 'block' : 'none';
-            chunkSizeInput.style.display = action === 'split_all' ? 'block' : 'none';
-        }
-        window.addEventListener('DOMContentLoaded', toggleInputs);
-    </script>
 </body>
 </html>
