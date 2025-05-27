@@ -90,8 +90,14 @@
       display: block;
     }
 
-    .submit-button, .cancel-button {
+    .button-container {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
       margin-top: 20px;
+    }
+
+    .submit-button, .cancel-button {
       display: inline-block;
     }
 
@@ -103,6 +109,7 @@
       border: none;
       border-radius: 5px;
       cursor: pointer;
+      width: 150px;
     }
 
     .cancel-button button {
@@ -134,6 +141,7 @@
 </head>
 <body>
   <h1>PDFページのプレビュー</h1>
+  <p>分割したい場所の点線を選択してから、「分割」ボタンを押してください。</p>
 
   <form id="splitForm" action="{{ url_for('confirm') }}" method="post">
     <div class="preview-wrapper">
@@ -157,16 +165,15 @@
     </div>
 
     <input type="hidden" name="split_points" id="splitPoints">
-    <div class="submit-button">
-      <button type="button" onclick="submitSplits()">続行（分割確認）</button>
+    <div class="button-container">
+      <div class="submit-button">
+        <button type="button" onclick="submitSplits()">分割</button>
+      </div>
+      <div class="cancel-button">
+        <button type="button" onclick="window.location.href='/'">キャンセル</button>
+      </div>
     </div>
   </form>
-
-  <div class="cancel-button">
-    <form action="{{ url_for('index') }}" method="get">
-      <button type="submit">キャンセル</button>
-    </form>
-  </div>
 
   <div id="popupOverlay">
     <div id="popupContent"></div>

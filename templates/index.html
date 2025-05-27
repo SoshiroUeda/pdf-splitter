@@ -1,4 +1,4 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
@@ -20,37 +20,78 @@
             box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
             text-align: center;
             width: 90%;
-            max-width: 400px;
+            max-width: 600px;
         }
         h1 {
             color: #333;
             margin-bottom: 20px;
+            font-size: 2em;
+        }
+        form {
+            margin-top: 20px;
         }
         input[type="file"] {
             margin-bottom: 20px;
         }
-        input[type="submit"] {
+        button {
             padding: 10px 20px;
-            background-color: #4CAF50;
+            background-color: #ff0000;
             color: white;
             border: none;
             border-radius: 4px;
             font-size: 16px;
             cursor: pointer;
         }
-        input[type="submit"]:hover {
-            background-color: #45a049;
+        button:hover {
+            background-color: #cc0000;
+        }
+        .cancel-button {
+            background-color: #aaa;
+        }
+        .cancel-button:hover {
+            background-color: #888;
+        }
+        .loading {
+            display: inline-block;
+            width: 50px;
+            height: 50px;
+            border: 5px solid rgba(0, 0, 0, 0.1);
+            border-radius: 50%;
+            border-top-color: #ff0000;
+            animation: spin 1s ease-in-out infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
         }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>PDFファイルをアップロード</h1>
-        <form action="{{ url_for('preview') }}" method="post" enctype="multipart/form-data">
+        <form id="uploadForm" enctype="multipart/form-data">
             <input type="file" name="file" accept=".pdf" required>
             <br>
-            <input type="submit" value="アップロード">
+            <button type="submit">アップロード</button>
         </form>
     </div>
+    <script>
+        document.getElementById('uploadForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            // Display uploading message with loading spinner
+            document.body.innerHTML = '<div style="text-align:center; margin-top:100px;"><p style="font-size:1.5em;">アップロード中です。しばらくお待ちください。</p><div class="loading"></div><br><button onclick="window.location.href=\'/\'" style="padding:10px 20px; background-color: #aaa;">キャンセル</button></div>';
+            // Asynchronously upload the PDF
+            var formData = new FormData(this);
+            fetch('/preview', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.text())
+            .then(html => {
+                document.open();
+                document.write(html);
+                document.close();
+            });
+        });
+    </script>
 </body>
 </html>
